@@ -1,4 +1,10 @@
-import { Client } from 'pg';
+import { connectDatabase } from '@/helpers/db-util';
+
+async function insertUsers(client, data) {
+  await client.connect();
+
+  await client.query('INSERT INTO users(email) VALUES($1)', [data.email]);
+}
 
 async function handler(req, res) {
   if (req.method === 'POST') {
@@ -9,19 +15,21 @@ async function handler(req, res) {
       return;
     }
 
-    // Connect to PostgreSQL
-    const client = new Client({
-      connectionString: process.env.POSTGRES_URL, // Set this in your .env.local
-    });
+    let client;
+    try {
+      client = await connectDatabase();
+    } catch (error) {
+      res.status(500).json({ message: 'Database connection failed.' });
+      return;
+    }
 
     try {
-      await client.connect();
-      await client.query('INSERT INTO users(email) VALUES($1)', [userEmail]);
+      await insertUsers(client, { email: userEmail });
       await client.end();
       res.status(201).json({ message: 'Signed up successfully!' });
     } catch (error) {
       await client.end();
-      res.status(500).json({ message: 'Database error.' });
+      res.status(500).json({ message: 'Inserting data failed!' });
     }
   } else {
     res.setHeader('Allow', ['POST']);
